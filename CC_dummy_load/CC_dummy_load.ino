@@ -4,11 +4,12 @@
 
 unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
-int interval = 1000;
+int interval = 2000;
 unsigned long k_currentMillis = 0;
 unsigned long k_previousMillis = 0;
 int k_interval = 250;
 int dacChipSelectPin = 9;
+int adcChipSelectPin = 8;
 int current = 0;
 int currentUpLimit = 4095;
 long power = 0;
@@ -18,8 +19,8 @@ char menu = '1';
 bool draw = true;
 bool load = false;
 char keyPressed = 'z';
-int ampsIn = 0;
-double voltsIn = 0;
+float ampsIn = 0;
+float voltsIn = 0;
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
@@ -101,16 +102,19 @@ void drawOnLoad()
     float c_power;
     float say_power;
 
-    voltsIn = readVolts();
-    ampsIn = readAmps();
+    /* voltsIn = (readAdc(0) * 8.0); */
+    /* ampsIn = (readAdc(1) * 10.0); */
+    ampsIn = (readAdc(0) * 10.0);
+    voltsIn = (readAdc(1) * 8.0);
 
     lcd.clear();
     lcd.setCursor(0,0);
 
     switch (menu) {
         case '1':
-            sprintf(line1, "CC %4dmA %4dmA", current, ampsIn);
+            sprintf(line1, "CC %4dmA %4dmA", current, round(ampsIn * 1000.000));
             lcd.print(line1);
+            /* lcd.print(ampsIn); */
             lcd.setCursor(0,1);
             lcd.print("ON ");
             if (voltsIn < 1) {
@@ -120,7 +124,7 @@ void drawOnLoad()
                 lcd.print(voltsIn, 2);
                 lcd.print("V ");
             }
-            c_power = voltsIn * ((float)ampsIn / 1000);
+            c_power = voltsIn * ampsIn;
             if (c_power < 1) {
                 lcd.print(round(c_power*1000));
                 lcd.print("mW");
@@ -130,7 +134,7 @@ void drawOnLoad()
             }
             break;
         case '2':
-            c_power = voltsIn * ((float)ampsIn / 1000);
+            c_power = voltsIn * ampsIn;
             lcd.print("CP ");
             if (power < 1000) {
                 lcd.print(power);
@@ -155,7 +159,7 @@ void drawOnLoad()
                 lcd.print(voltsIn, 2);
                 lcd.print("V ");
             }
-            sprintf(line2, " %4dmA", ampsIn);
+            sprintf(line2, " %4dmA", round(ampsIn * 1000.000));
             lcd.print(line2);
             break;
         default:
@@ -256,19 +260,40 @@ char readKeypad()
     }
     return caracter;
 }
-
-int readAmps()
-{
-    return 1000;
-}
-
-float readVolts()
-{
-    return 5.2;
-}
 /* //// Read Value functions */
 
 /* Low level functions */
+
+float readAdc(int channel) {
+  byte adcPrimaryConfig = 0b00000001;     // only contains the start bit
+  byte adcSecondaryConfig;
+  if (channel == 0) {
+      adcSecondaryConfig = 0b10100000;
+  } else {
+      adcSecondaryConfig = 0b11100000;
+  }
+  /* byte adcSecondaryConfig = channel << 6; */
+  /* byte configMask = 0b11100000; */
+  /* adcSecondaryConfig &= configMask; */
+  Serial.print(adcPrimaryConfig, BIN); Serial.print(" "); Serial.print(adcSecondaryConfig, BIN);
+  Serial.println(" ");
+  noInterrupts(); // disable interupts to prepare to send address data to the ADC.  
+  digitalWrite(adcChipSelectPin,LOW); // take the Chip Select pin low to select the ADC.
+  SPI.transfer(adcPrimaryConfig); //  send in the primary configuration address byte to the ADC.  
+  byte adcPrimaryByte = SPI.transfer(adcSecondaryConfig); // read the primary byte, also sending in the secondary address byte.  
+  byte adcSecondaryByte = SPI.transfer(0x00); // read the secondary byte, also sending 0 as this doesn't matter. 
+  digitalWrite(adcChipSelectPin,HIGH); // take the Chip Select pin high to de-select the ADC.
+  interrupts(); // Enable interupts.
+  Serial.print(adcPrimaryByte, BIN); Serial.print(" "); Serial.print(adcSecondaryByte, BIN);
+  Serial.println(" ");
+  Serial.println(" ");
+  byte adcPrimaryByteMask = 0b00001111;      // b00001111 isolates the 4 LSB for the value returned. 
+  adcPrimaryByte &= adcPrimaryByteMask; // Limits the value of the primary byte to the 4 LSB:
+  int digitalValue = (adcPrimaryByte << 8) | adcSecondaryByte; // Shifts the 4 LSB of the primary byte to become the 4 MSB of the 12 bit digital value, this is then ORed to the secondary byte value that holds the 8 LSB of the digital value.
+  float value = (float(digitalValue) * 4.096) / 4096.000; // The digital value is converted to an analogue voltage using a VREF of 2.048V.
+  return value; // Returns the value from the function
+}
+
 void setDac(int value)
 {
     /*
@@ -301,10 +326,13 @@ void setup()
 {
     pinMode(dacChipSelectPin, OUTPUT);
     digitalWrite(dacChipSelectPin, HIGH);
+    pinMode(adcChipSelectPin, OUTPUT);
+    digitalWrite(adcChipSelectPin, HIGH);
     Serial.begin(9600);
     SPI.begin();
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
+    SPI.setClockDivider(SPI_CLOCK_DIV16);
 
     lcd.begin(16,2);
     lcd.backlight();
