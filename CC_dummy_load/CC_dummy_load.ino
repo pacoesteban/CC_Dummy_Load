@@ -12,6 +12,7 @@ int dacChipSelectPin = 9;
 int current = 0;
 int currentUpLimit = 4095;
 long power = 0;
+long powerUpLimit = 120000;
 int sensorPin = A0;
 char menu = '1';
 bool draw = true;
@@ -22,88 +23,74 @@ double voltsIn = 0;
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
-void setup() {
-    pinMode(dacChipSelectPin, OUTPUT);
-    digitalWrite(dacChipSelectPin, HIGH);
-    Serial.begin(9600);
-    SPI.begin();
-    SPI.setBitOrder(MSBFIRST);
-    SPI.setDataMode(SPI_MODE0);
-
-    lcd.begin(16,2);
-    lcd.backlight();
-    lcd.clear();
-    lcd.cursor();
-    lcd.blink();
-    delay(500);
-    printWelcome();
-    delay(500);
-    drawMenu(menu);
+/* Menu and print functions */
+void printWelcome()
+{
+    lcd.setCursor(0,0);
+    lcd.print("CC Dummy Load");
+    lcd.setCursor(0,1);
+    lcd.print(".....");
 }
 
-void loop() {
-    if (load) {
-        currentMillis = millis();
-        if ((currentMillis - previousMillis) > interval) {
-            previousMillis = currentMillis;
-            drawOnLoad();
+void drawMenu(int menu_section, bool setMenu = false)
+{
+    if (draw) {
+        lcd.clear();
+        String sectionTitle;
+        char line2[17];
+        switch (menu_section) {
+            case '1':
+                if (setMenu) {
+                    sectionTitle = "Set Current";
+                    sprintf(line2, "        mA");
+                } else {
+                    sectionTitle = "Constant Current";
+                    sprintf(line2, "%4d  mA", current);
+                }
+                break;
+            case '2':
+                if (setMenu) {
+                    sectionTitle = "Set Power";
+                    sprintf(line2, "        mW");
+                } else {
+                    sectionTitle = "Constant Power";
+                    sprintf(line2, "%5d  mW", power);
+                }
+                break;
+            default:
+                Serial.print("do nothing");
         }
+        lcd.setCursor(0,0);
+        lcd.print(sectionTitle);
+        lcd.setCursor(5,1);
+        lcd.print(line2);
     }
-    keyPressed = readKeypad();
-    if (keyPressed == '#') {
-        if (load) {
-            lcd.clear();
-            lcd.setCursor(0,0);
-            lcd.print("Stop load first !");
-            draw = true;
-            
-        } else {
-            setValueMenu(menu);
-        }
-    }
-    if (keyPressed == '*') {
-        load = !load;
-        if (load) {
-            if (menu == '1') {
-                startCC();
-            }
-            if (menu == '2') {
-                /* startCP(); */
-            }
-        } else {
-            setDac(0);
-            draw = true;
-            drawMenu(menu);
-        }
-    }
-    if (isDigit(keyPressed)) {
-        menu = keyPressed;
+}
+
+void setValueMenu(char menu_section)
+{
+        lcd.clear();
+        lcd.cursor();
+        lcd.blink();
         draw = true;
+        drawMenu(menu, true);
+        switch (menu_section) {
+            case '1':
+                lcd.setCursor(4,1);
+                current = setValue(4);
+                break;
+            case '2':
+                lcd.setCursor(3,1);
+                power = setValue(3);
+                break;
+            default:
+                lcd.setCursor(0,0);
+                lcd.print("No mode !");
+                menu = 1;
+        }
+        lcd.noCursor();
+        lcd.noBlink();
         drawMenu(menu);
-    }
-    draw = false;
-}
-
-int readAmps()
-{
-    return 1000;
-}
-
-float readVolts()
-{
-    return 5.2;
-}
-
-
-void startCC()
-{
-    if (current > currentUpLimit) {
-        current = currentUpLimit;
-    }
-    if (current > 0) {
-        setDac(current);
-    }
-
 }
 
 void drawOnLoad()
@@ -125,23 +112,49 @@ void drawOnLoad()
             sprintf(line1, "CC %4dmA %4dmA", current, ampsIn);
             lcd.print(line1);
             lcd.setCursor(0,1);
-            lcd.print(voltsIn, 3);
-            lcd.print("V ");
+            lcd.print("ON ");
+            if (voltsIn < 1) {
+                lcd.print(round(voltsIn*1000));
+                lcd.print("mV ");
+            } else {
+                lcd.print(voltsIn, 2);
+                lcd.print("V ");
+            }
             c_power = voltsIn * ((float)ampsIn / 1000);
-            lcd.print(c_power, 3);
-            lcd.print("W");
+            if (c_power < 1) {
+                lcd.print(round(c_power*1000));
+                lcd.print("mW");
+            } else {
+                lcd.print(c_power, 2);
+                lcd.print("W");
+            }
             break;
         case '2':
             c_power = voltsIn * ((float)ampsIn / 1000);
-            say_power = power / 100;
             lcd.print("CP ");
-            lcd.print(say_power, 2);
-            lcd.print("W ");
-            lcd.print(c_power, 3);
-            lcd.print("W");
+            if (power < 1000) {
+                lcd.print(power);
+                lcd.print("mW ");
+            } else {
+                lcd.print(power/1000, 2);
+                lcd.print("W ");
+            }
+            if (c_power < 1) {
+                lcd.print(round(c_power*1000));
+                lcd.print("W");
+            } else {
+                lcd.print(c_power, 2);
+                lcd.print("W");
+            }
             lcd.setCursor(0,1);
-            lcd.print(voltsIn, 3);
-            lcd.print("V");
+            lcd.print("ON ");
+            if (voltsIn < 1) {
+                lcd.print(round(voltsIn*1000));
+                lcd.print("mV ");
+            } else {
+                lcd.print(voltsIn, 2);
+                lcd.print("V ");
+            }
             sprintf(line2, " %4dmA", ampsIn);
             lcd.print(line2);
             break;
@@ -150,87 +163,45 @@ void drawOnLoad()
     }
     
 }
+/* //// Menu and print functions */
 
-void printWelcome()
+/* Action functions */
+void startCC()
 {
-    lcd.setCursor(0,0);
-    lcd.print("CC Dummy Load");
-    lcd.setCursor(0,1);
-    lcd.print(".....");
+    if (current > currentUpLimit) {
+        current = currentUpLimit;
+    }
+    if (current > 0) {
+        setDac(current);
+    }
+
 }
 
-void drawMenu(int menu_section)
+void startCP()
 {
-    if (draw) {
-        lcd.clear();
-        char line2[16];
-        switch (menu_section) {
-            case '1':
-                lcd.setCursor(0,0);
-                lcd.print("Constant Current");
-                lcd.setCursor(5,1);
-                sprintf(line2, "%4d mA ", current);
-                lcd.print(line2);
-                break;
-            case '2':
-                lcd.setCursor(0,0);
-                lcd.print("Constant Power");
-                lcd.setCursor(5,1);
-                sprintf(line2, "%4d mW ", power);
-                lcd.print(line2);
-                break;
-            default:
-                Serial.print("do nothing");
-        }
+    if (power > powerUpLimit) {
+        power = powerUpLimit;
+    }
+    if (power > 0) {
+        updatePower();
     }
 }
 
-void setValueMenu(char menu_section)
+void updatePower()
 {
-        lcd.clear();
-        char line2[16];
-
-        lcd.setCursor(0,0);
-
-        switch (menu_section) {
-            case '1':
-                lcd.print("Set Current");
-                lcd.setCursor(10,1);
-                lcd.print("mA");
-                lcd.setCursor(5,1);
-                current = setValue(5);
-                break;
-            case '2':
-                lcd.print("Set Power");
-                lcd.setCursor(11,1);
-                lcd.print(" mW");
-                lcd.setCursor(4,1);
-                power = setValue(4);
-                break;
-            default:
-                lcd.setCursor(0,0);
-                lcd.print("No mode !");
-                sprintf(line2, "buuuu ...");
-                menu = 1;
-        }
-        draw = true;
-        drawMenu(menu);
+    int target_mA;
+    target_mA = round((float)power / voltsIn);
+    if (target_mA > currentUpLimit) {
+        target_mA = currentUpLimit;
+    }
+    if (target_mA > 0) {
+        setDac(target_mA);
+    }
 }
 
 
-int setValue(int pos) {
-    /* int digits = 0; */
-    /* String inString; */
-    /* while (digits < 4) { */
-    /*     char newchar = readKeypad(); */
-    /*     if (isDigit(newchar)) { */
-    /*         lcd.setCursor(digits+5,1); */
-    /*         lcd.print(newchar); */
-
-    /*         inString += (char)newchar; */
-    /*         digits++; */
-    /*     } */
-    /* } */
+int setValue(int pos)
+{
     String inString;
     char newchar;
     newchar = readKeypad();
@@ -246,8 +217,11 @@ int setValue(int pos) {
     }
     return inString.toInt();
 }
+/* //// Action functions */
 
-char readKeypad() {
+/* Read Value functions */
+char readKeypad()
+{
     int caracter;
     k_currentMillis = millis();
     if ((k_currentMillis - k_previousMillis) > k_interval) {
@@ -283,11 +257,20 @@ char readKeypad() {
     return caracter;
 }
 
-/*
-   Function to set the DAC, Accepts the Value to be sent and the cannel
-   of the DAC to be used.
-*/
-void setDac(int value) {
+int readAmps()
+{
+    return 1000;
+}
+
+float readVolts()
+{
+    return 5.2;
+}
+/* //// Read Value functions */
+
+/* Low level functions */
+void setDac(int value)
+{
     /*
        Sets default DAC registers B00110000, 1st bit "write to register",
        2nd Bit bypasses input Buffer, 3rd bit sets output gain to 1x, 4th
@@ -311,4 +294,72 @@ void setDac(int value) {
     SPI.transfer(dacSecondaryByte);// send in the Secondary Byte
     digitalWrite(dacChipSelectPin,HIGH);// take the Chip Select pin high to de-select the DAC:
     interrupts(); // Enable interupts
+}
+/* //// Low level functions */
+
+void setup()
+{
+    pinMode(dacChipSelectPin, OUTPUT);
+    digitalWrite(dacChipSelectPin, HIGH);
+    Serial.begin(9600);
+    SPI.begin();
+    SPI.setBitOrder(MSBFIRST);
+    SPI.setDataMode(SPI_MODE0);
+
+    lcd.begin(16,2);
+    lcd.backlight();
+    lcd.clear();
+    delay(500);
+    printWelcome();
+    delay(500);
+    drawMenu(menu);
+}
+
+void loop()
+{
+    if (load) {
+        currentMillis = millis();
+        if ((currentMillis - previousMillis) > interval) {
+            previousMillis = currentMillis;
+            drawOnLoad();
+            if (menu == '2') {
+                updatePower();
+            }
+        }
+    }
+    keyPressed = readKeypad();
+    if (keyPressed == '#') {
+        if (load) {
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Stop load first !");
+            draw = true;
+            
+        } else {
+            setValueMenu(menu);
+        }
+    }
+    if (keyPressed == '*') {
+        load = !load;
+        if (load) {
+            /* Start ! */
+            if (menu == '1') {
+                startCC();
+            }
+            if (menu == '2') {
+                /* startCP(); */
+            }
+        } else {
+            /* Stop ! */
+            setDac(0);
+            draw = true;
+            drawMenu(menu);
+        }
+    }
+    if (isDigit(keyPressed)) {
+        menu = keyPressed;
+        draw = true;
+        drawMenu(menu);
+    }
+    draw = false;
 }
