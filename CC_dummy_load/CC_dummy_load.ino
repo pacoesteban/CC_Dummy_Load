@@ -102,10 +102,13 @@ void drawOnLoad()
     float c_power;
     float say_power;
 
-    /* voltsIn = (readAdc(0) * 8.0); */
-    /* ampsIn = (readAdc(1) * 10.0); */
     ampsIn = (readAdc(0) * 10.0);
     voltsIn = (readAdc(1) * 8.0);
+
+    /* Serial.print("Amps: "); */
+    /* Serial.println(ampsIn, 4); */
+    /* Serial.print("Volts: "); */
+    /* Serial.println(voltsIn, 4); */
 
     lcd.clear();
     lcd.setCursor(0,0);
@@ -140,12 +143,12 @@ void drawOnLoad()
                 lcd.print(power);
                 lcd.print("mW ");
             } else {
-                lcd.print(power/1000, 2);
+                lcd.print(power/1000.000, 2);
                 lcd.print("W ");
             }
             if (c_power < 1) {
                 lcd.print(round(c_power*1000));
-                lcd.print("W");
+                lcd.print("mW");
             } else {
                 lcd.print(c_power, 2);
                 lcd.print("W");
@@ -159,7 +162,7 @@ void drawOnLoad()
                 lcd.print(voltsIn, 2);
                 lcd.print("V ");
             }
-            sprintf(line2, " %4dmA", round(ampsIn * 1000.000));
+            sprintf(line2, "%4dmA", round(ampsIn * 1000.000));
             lcd.print(line2);
             break;
         default:
@@ -272,11 +275,6 @@ float readAdc(int channel) {
   } else {
       adcSecondaryConfig = 0b11100000;
   }
-  /* byte adcSecondaryConfig = channel << 6; */
-  /* byte configMask = 0b11100000; */
-  /* adcSecondaryConfig &= configMask; */
-  Serial.print(adcPrimaryConfig, BIN); Serial.print(" "); Serial.print(adcSecondaryConfig, BIN);
-  Serial.println(" ");
   noInterrupts(); // disable interupts to prepare to send address data to the ADC.  
   digitalWrite(adcChipSelectPin,LOW); // take the Chip Select pin low to select the ADC.
   SPI.transfer(adcPrimaryConfig); //  send in the primary configuration address byte to the ADC.  
@@ -284,13 +282,15 @@ float readAdc(int channel) {
   byte adcSecondaryByte = SPI.transfer(0x00); // read the secondary byte, also sending 0 as this doesn't matter. 
   digitalWrite(adcChipSelectPin,HIGH); // take the Chip Select pin high to de-select the ADC.
   interrupts(); // Enable interupts.
-  Serial.print(adcPrimaryByte, BIN); Serial.print(" "); Serial.print(adcSecondaryByte, BIN);
-  Serial.println(" ");
-  Serial.println(" ");
   byte adcPrimaryByteMask = 0b00001111;      // b00001111 isolates the 4 LSB for the value returned. 
   adcPrimaryByte &= adcPrimaryByteMask; // Limits the value of the primary byte to the 4 LSB:
   int digitalValue = (adcPrimaryByte << 8) | adcSecondaryByte; // Shifts the 4 LSB of the primary byte to become the 4 MSB of the 12 bit digital value, this is then ORed to the secondary byte value that holds the 8 LSB of the digital value.
-  float value = (float(digitalValue) * 4.096) / 4096.000; // The digital value is converted to an analogue voltage using a VREF of 2.048V.
+  float value = ((float)digitalValue * 4.096) / 4095.000; // The digital value is converted to an analogue voltage using a VREF of 2.048V.
+
+  /* Serial.print("Channel: "); Serial.print(channel); */
+  /* Serial.print(" Raw value: "); Serial.print(digitalValue); */
+  /* Serial.print(" calculat value: "); Serial.println(value, 4); */
+
   return value; // Returns the value from the function
 }
 
