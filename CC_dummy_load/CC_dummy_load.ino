@@ -102,8 +102,19 @@ void drawOnLoad()
     float c_power;
     float say_power;
 
-    ampsIn = (readAdc(0) * 10.0);
-    voltsIn = (readAdc(1) * 8.0);
+    ampsIn = (readAdc(1) * 10.0);
+    voltsIn = (readAdc(0) * 8.0);
+
+        
+    if ((ampsIn > 0) && (ampsIn < 0.700)) {
+        ampsIn += 0.070;
+    } else if (ampsIn < 1.900) {
+        ampsIn += 0.060;
+    } else if (ampsIn < 3.000) {
+        ampsIn += 0.050;
+    } else {
+        ampsIn += 0.040;
+    }
 
     /* Serial.print("Amps: "); */
     /* Serial.println(ampsIn, 4); */
@@ -333,6 +344,7 @@ void setup()
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
     SPI.setClockDivider(SPI_CLOCK_DIV16);
+    setDac(0);
 
     lcd.begin(16,2);
     lcd.backlight();
