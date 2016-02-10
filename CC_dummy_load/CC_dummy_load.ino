@@ -4,7 +4,7 @@
 
 unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
-int interval = 2000;
+int interval = 1000;
 unsigned long k_currentMillis = 0;
 unsigned long k_previousMillis = 0;
 int k_interval = 250;
@@ -39,6 +39,8 @@ void drawMenu(int menu_section, bool setMenu = false)
         lcd.clear();
         String sectionTitle;
         char line2[17];
+        float valueFloat;
+        char valueStr[8];
         switch (menu_section) {
             case '1':
                 if (setMenu) {
@@ -46,7 +48,9 @@ void drawMenu(int menu_section, bool setMenu = false)
                     sprintf(line2, "        A");
                 } else {
                     sectionTitle = "Constant Current";
-                    sprintf(line2, "%4d  mA", current);
+                    valueFloat = (float)current / 1000.0;
+                    dtostrf(valueFloat,3,3,valueStr);
+                    sprintf(line2, "%s  A", valueStr);
                 }
                 break;
             case '2':
@@ -55,10 +59,9 @@ void drawMenu(int menu_section, bool setMenu = false)
                     sprintf(line2, "        W");
                 } else {
                     sectionTitle = "Constant Power";
-                    float float_power = (float)power / 1000.0;
-                    char float_str[12];
-                    dtostrf(float_power,4,2,float_str);
-                    sprintf(line2, "%s  W", float_str);
+                    valueFloat = (float)power / 1000.0;
+                    dtostrf(valueFloat,3,3,valueStr);
+                    sprintf(line2, "%s  W", valueStr);
                 }
                 break;
             default:
@@ -386,7 +389,7 @@ void loop()
                 startCC();
             }
             if (menu == '2') {
-                /* startCP(); */
+                startCP();
             }
         } else {
             /* Stop ! */
