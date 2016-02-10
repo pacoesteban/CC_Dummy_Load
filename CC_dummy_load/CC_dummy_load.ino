@@ -59,7 +59,8 @@ void drawMenu(int menu_section, bool setMenu = false)
                 }
                 break;
             default:
-                Serial.print("do nothing");
+                sectionTitle = "Option not";
+                sprintf(line2, "available");
         }
         lcd.setCursor(0,0);
         lcd.print(sectionTitle);
@@ -104,22 +105,6 @@ void drawOnLoad()
 
     ampsIn = (readAdc(1) * 10.0);
     voltsIn = (readAdc(0) * 8.0);
-
-        
-    if ((ampsIn > 0) && (ampsIn < 0.700)) {
-        ampsIn += 0.070;
-    } else if (ampsIn < 1.900) {
-        ampsIn += 0.060;
-    } else if (ampsIn < 3.000) {
-        ampsIn += 0.050;
-    } else {
-        ampsIn += 0.040;
-    }
-
-    /* Serial.print("Amps: "); */
-    /* Serial.println(ampsIn, 4); */
-    /* Serial.print("Volts: "); */
-    /* Serial.println(voltsIn, 4); */
 
     lcd.clear();
     lcd.setCursor(0,0);
@@ -278,7 +263,8 @@ char readKeypad()
 
 /* Low level functions */
 
-float readAdc(int channel) {
+float readAdc(int channel)
+{
   byte adcPrimaryConfig = 0b00000001;     // only contains the start bit
   byte adcSecondaryConfig;
   if (channel == 0) {
@@ -343,7 +329,8 @@ void setup()
     SPI.begin();
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
-    SPI.setClockDivider(SPI_CLOCK_DIV16);
+    /* SPI.setClockDivider(SPI_CLOCK_DIV16); */
+    SPI.setClockDivider(SPI_CLOCK_DIV8);
     setDac(0);
 
     lcd.begin(16,2);
