@@ -43,7 +43,7 @@ void drawMenu(int menu_section, bool setMenu = false)
             case '1':
                 if (setMenu) {
                     sectionTitle = "Set Current";
-                    sprintf(line2, "        mA");
+                    sprintf(line2, "        A");
                 } else {
                     sectionTitle = "Constant Current";
                     sprintf(line2, "%4d  mA", current);
@@ -52,10 +52,13 @@ void drawMenu(int menu_section, bool setMenu = false)
             case '2':
                 if (setMenu) {
                     sectionTitle = "Set Power";
-                    sprintf(line2, "        mW");
+                    sprintf(line2, "        W");
                 } else {
                     sectionTitle = "Constant Power";
-                    sprintf(line2, "%5d  mW", power);
+                    float float_power = (float)power / 1000.0;
+                    char float_str[12];
+                    dtostrf(float_power,4,2,float_str);
+                    sprintf(line2, "%s  W", float_str);
                 }
                 break;
             default:
@@ -71,28 +74,30 @@ void drawMenu(int menu_section, bool setMenu = false)
 
 void setValueMenu(char menu_section)
 {
-        lcd.clear();
-        lcd.cursor();
-        lcd.blink();
-        draw = true;
-        drawMenu(menu, true);
-        switch (menu_section) {
-            case '1':
-                lcd.setCursor(4,1);
-                current = setValue(4);
-                break;
-            case '2':
-                lcd.setCursor(3,1);
-                power = setValue(3);
-                break;
-            default:
-                lcd.setCursor(0,0);
-                lcd.print("No mode !");
-                menu = 1;
-        }
-        lcd.noCursor();
-        lcd.noBlink();
-        drawMenu(menu);
+    float userInput;
+
+    lcd.clear();
+    lcd.cursor();
+    lcd.blink();
+    draw = true;
+    drawMenu(menu, true);
+    lcd.setCursor(5,1);
+    userInput = getValue(5);
+    switch (menu_section) {
+        case '1':
+            current = round(userInput * 1000.0);
+            break;
+        case '2':
+            power = round(userInput * 1000.0);
+            break;
+        default:
+            lcd.setCursor(0,0);
+            lcd.print("No mode !");
+            menu = 1;
+    }
+    lcd.noCursor();
+    lcd.noBlink();
+    drawMenu(menu);
 }
 
 void drawOnLoad()
@@ -203,7 +208,7 @@ void updatePower()
 }
 
 
-int setValue(int pos)
+float getValue(int pos)
 {
     String inString;
     char newchar;
@@ -216,9 +221,16 @@ int setValue(int pos)
             inString += (char)newchar;
             pos++;
         }
+        if (newchar == '*') {
+            lcd.setCursor(pos,1);
+            lcd.print('.');
+
+            inString += '.';
+            pos++;
+        }
         newchar = readKeypad();
     }
-    return inString.toInt();
+    return inString.toFloat();
 }
 /* //// Action functions */
 
