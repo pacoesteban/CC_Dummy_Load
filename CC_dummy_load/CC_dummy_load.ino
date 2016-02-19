@@ -2,19 +2,22 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
+#define DAC_CS 7
+#define ADC_CS 8
+#define TEMP_PIN A1
+#define KEYPAD_PIN A0
+#define FAN_PIN 9
+#define INTERVAL 1000
+#define K_INTERVAL 250
+#define CURRENT_LIMIT 4095
+#define POWER_LIMIT 120000
+
 unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
-int interval = 1000;
 unsigned long k_currentMillis = 0;
 unsigned long k_previousMillis = 0;
-int k_interval = 250;
-int dacChipSelectPin = 9;
-int adcChipSelectPin = 8;
 int current = 0;
-int currentUpLimit = 4095;
 long power = 0;
-long powerUpLimit = 120000;
-int sensorPin = A0;
 char menu = '1';
 bool draw = true;
 bool load = false;
@@ -179,8 +182,8 @@ void drawOnLoad()
 /* Action functions */
 void startCC()
 {
-    if (current > currentUpLimit) {
-        current = currentUpLimit;
+    if (current > CURRENT_LIMIT) {
+        current = CURRENT_LIMIT;
     }
     if (current > 0) {
         setDac(current);
@@ -190,8 +193,8 @@ void startCC()
 
 void startCP()
 {
-    if (power > powerUpLimit) {
-        power = powerUpLimit;
+    if (power > POWER_LIMIT) {
+        power = POWER_LIMIT;
     }
     if (power > 0) {
         updatePower();
@@ -202,14 +205,13 @@ void updatePower()
 {
     int target_mA;
     target_mA = round((float)power / voltsIn);
-    if (target_mA > currentUpLimit) {
-        target_mA = currentUpLimit;
+    if (target_mA > CURRENT_LIMIT) {
+        target_mA = CURRENT_LIMIT;
     }
     if (target_mA > 0) {
         setDac(target_mA);
     }
 }
-
 
 float getValue(int pos)
 {
@@ -235,16 +237,35 @@ float getValue(int pos)
     }
     return inString.toFloat();
 }
+
+void setFanSpeed(int temp)
+{
+    int fanValue;
+    fanValue = map(temp, 25, 75, 110, 255);
+    if (temp < 25) {
+        fanValue = 0;
+    }
+    if (temp > 75) {
+        fanValue = 255;
+    }
+    analogWrite(FAN_PIN, fanValue);
+}
+
 /* //// Action functions */
 
 /* Read Value functions */
+int readTemp()
+{
+    return (5.0 * analogRead(TEMP_PIN) * 100.0) / 1024;
+}
+
 char readKeypad()
 {
     int caracter;
     k_currentMillis = millis();
-    if ((k_currentMillis - k_previousMillis) > k_interval) {
+    if ((k_currentMillis - k_previousMillis) > K_INTERVAL) {
         k_previousMillis = k_currentMillis;
-        int sensorValue = analogRead(sensorPin);
+        int sensorValue = analogRead(KEYPAD_PIN);
 
         if (sensorValue > 920) {
            caracter = '1';
@@ -277,7 +298,6 @@ char readKeypad()
 /* //// Read Value functions */
 
 /* Low level functions */
-
 float readAdc(int channel)
 {
   byte adcPrimaryConfig = 0b00000001;     // only contains the start bit
@@ -288,11 +308,11 @@ float readAdc(int channel)
       adcSecondaryConfig = 0b11100000;
   }
   noInterrupts(); // disable interupts to prepare to send address data to the ADC.  
-  digitalWrite(adcChipSelectPin,LOW); // take the Chip Select pin low to select the ADC.
+  digitalWrite(ADC_CS,LOW); // take the Chip Select pin low to select the ADC.
   SPI.transfer(adcPrimaryConfig); //  send in the primary configuration address byte to the ADC.  
   byte adcPrimaryByte = SPI.transfer(adcSecondaryConfig); // read the primary byte, also sending in the secondary address byte.  
   byte adcSecondaryByte = SPI.transfer(0x00); // read the secondary byte, also sending 0 as this doesn't matter. 
-  digitalWrite(adcChipSelectPin,HIGH); // take the Chip Select pin high to de-select the ADC.
+  digitalWrite(ADC_CS,HIGH); // take the Chip Select pin high to de-select the ADC.
   interrupts(); // Enable interupts.
   byte adcPrimaryByteMask = 0b00001111;      // b00001111 isolates the 4 LSB for the value returned. 
   adcPrimaryByte &= adcPrimaryByteMask; // Limits the value of the primary byte to the 4 LSB:
@@ -326,20 +346,23 @@ void setDac(int value)
     byte dacSecondaryByte = value & dacSecondaryByteMask;
 
     noInterrupts(); // disable interupts to prepare to send data to the DAC
-    digitalWrite(dacChipSelectPin,LOW); // take the Chip Select pin low to select the DAC:
+    digitalWrite(DAC_CS,LOW); // take the Chip Select pin low to select the DAC:
     SPI.transfer(dacPrimaryByte); //  send in the Primary Byte:
     SPI.transfer(dacSecondaryByte);// send in the Secondary Byte
-    digitalWrite(dacChipSelectPin,HIGH);// take the Chip Select pin high to de-select the DAC:
+    digitalWrite(DAC_CS,HIGH);// take the Chip Select pin high to de-select the DAC:
     interrupts(); // Enable interupts
 }
 /* //// Low level functions */
 
 void setup()
 {
-    pinMode(dacChipSelectPin, OUTPUT);
-    digitalWrite(dacChipSelectPin, HIGH);
-    pinMode(adcChipSelectPin, OUTPUT);
-    digitalWrite(adcChipSelectPin, HIGH);
+    pinMode(DAC_CS, OUTPUT);
+    digitalWrite(DAC_CS, HIGH);
+    pinMode(ADC_CS, OUTPUT);
+    digitalWrite(ADC_CS, HIGH);
+    // Timer1 now runs at 31372.55Hz
+    // this way we don't "hear" the PWM to the fan.
+    TCCR1B = (TCCR1B & 0b11111000) | 0x01; 
     Serial.begin(9600);
     SPI.begin();
     SPI.setBitOrder(MSBFIRST);
@@ -347,6 +370,7 @@ void setup()
     /* SPI.setClockDivider(SPI_CLOCK_DIV16); */
     SPI.setClockDivider(SPI_CLOCK_DIV8);
     setDac(0);
+    setFanSpeed(0);
 
     lcd.begin(16,2);
     lcd.backlight();
@@ -361,8 +385,9 @@ void loop()
 {
     if (load) {
         currentMillis = millis();
-        if ((currentMillis - previousMillis) > interval) {
+        if ((currentMillis - previousMillis) > INTERVAL) {
             previousMillis = currentMillis;
+            setFanSpeed(readTemp());
             drawOnLoad();
             if (menu == '2') {
                 updatePower();
