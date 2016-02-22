@@ -11,6 +11,7 @@
 #define K_INTERVAL 250
 #define CURRENT_LIMIT 4095
 #define POWER_LIMIT 120000
+#define MAX_TEMP 85
 
 unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
@@ -24,6 +25,7 @@ bool load = false;
 char keyPressed = 'z';
 float ampsIn = 0;
 float voltsIn = 0;
+int fetTemp = 0;
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
@@ -177,6 +179,18 @@ void drawOnLoad()
     }
     
 }
+
+void drawError(char line1[17], char line2[17])
+{
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print(line1);
+    lcd.setCursor(0,1);
+    lcd.print(line2);
+    draw = true;
+    delay(1500);
+}
+
 /* //// Menu and print functions */
 
 /* Action functions */
@@ -250,7 +264,6 @@ void setFanSpeed(int temp)
     }
     analogWrite(FAN_PIN, fanValue);
 }
-
 /* //// Action functions */
 
 /* Read Value functions */
@@ -387,7 +400,16 @@ void loop()
         currentMillis = millis();
         if ((currentMillis - previousMillis) > INTERVAL) {
             previousMillis = currentMillis;
-            setFanSpeed(readTemp());
+            fetTemp = readTemp();
+            if (fetTemp < MAX_TEMP) {
+                setFanSpeed(readTemp());
+            } else {
+                load = false;
+                setDac(0);
+                setFanSpeed(100);
+                drawError("Temperature", "Overload !!!");
+                setFanSpeed(0);
+            }
             drawOnLoad();
             if (menu == '2') {
                 updatePower();
@@ -397,10 +419,7 @@ void loop()
     keyPressed = readKeypad();
     if (keyPressed == '#') {
         if (load) {
-            lcd.clear();
-            lcd.setCursor(0,0);
-            lcd.print("Stop load first !");
-            draw = true;
+            drawError("Stop load first!", " ");
             
         } else {
             setValueMenu(menu);
