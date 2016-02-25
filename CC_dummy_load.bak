@@ -263,7 +263,7 @@ U 1 1 56A8E0D5
 P 6400 2450
 F 0 "RV2" V 6354 2367 50  0000 R CNN
 F 1 "10k" V 6446 2367 50  0000 R CNN
-F 2 "Resistors_ThroughHole:Resistor_Horizontal_RM10mm" H 6400 2450 50  0001 C CNN
+F 2 "Potentiometers:Potentiometer_Trimmer-Suntan-TSR-3386P" H 6400 2450 50  0001 C CNN
 F 3 "" H 6400 2450 50  0000 C CNN
 	1    6400 2450
 	0    1    1    0   
