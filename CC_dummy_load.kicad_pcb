@@ -14,8 +14,9 @@
 
   (page A4)
   (title_block
-    (date 2016-02-24)
-    (rev 1)
+    (title "Fucking DC Dummy Load")
+    (date 2016-03-09)
+    (rev 2)
   )
 
   (layers
