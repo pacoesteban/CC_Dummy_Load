@@ -1,4 +1,4 @@
-update=Wed 27 Jan 2016 03:33:11 PM CET
+update=Mon 07 Mar 2016 05:06:11 PM CET
 version=1
 last_client=kicad
 [pcbnew]
@@ -27,7 +27,7 @@ NetIExt=net
 version=1
 [eeschema]
 version=1
-LibDir=
+LibDir=../kicad_libs
 [eeschema/libraries]
 LibName1=power
 LibName2=device
@@ -59,3 +59,4 @@ LibName27=atmel
 LibName28=contrib
 LibName29=valves
 LibName30=/home/paco/src/electronica/kicad_libs/max6241
+LibName31=/home/paco/src/electronica/kicad_libs/arduino

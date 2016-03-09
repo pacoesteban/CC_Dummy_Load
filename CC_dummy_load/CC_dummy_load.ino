@@ -4,8 +4,8 @@
 
 #define DAC_CS 7
 #define ADC_CS 8
-#define TEMP_PIN A1
-#define KEYPAD_PIN A0
+#define TEMP_PIN A0
+#define KEYPAD_PIN A1
 #define FAN_PIN 9
 #define INTERVAL 1000
 #define K_INTERVAL 250
