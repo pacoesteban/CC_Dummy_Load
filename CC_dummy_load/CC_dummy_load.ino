@@ -22,6 +22,7 @@ long power = 0;
 char menu = '1';
 bool draw = true;
 bool load = false;
+bool showTemp = false;
 char keyPressed = 'z';
 float ampsIn = 0;
 float voltsIn = 0;
@@ -122,60 +123,67 @@ void drawOnLoad()
     lcd.clear();
     lcd.setCursor(0,0);
 
-    switch (menu) {
-        case '1':
-            sprintf(line1, "CC %4dmA %4dmA", current, round(ampsIn * 1000.000));
-            lcd.print(line1);
-            /* lcd.print(ampsIn); */
-            lcd.setCursor(0,1);
-            lcd.print("ON ");
-            if (voltsIn < 1) {
-                lcd.print(round(voltsIn*1000));
-                lcd.print("mV ");
-            } else {
-                lcd.print(voltsIn, 2);
-                lcd.print("V ");
-            }
-            c_power = voltsIn * ampsIn;
-            if (c_power < 1) {
-                lcd.print(round(c_power*1000));
-                lcd.print("mW");
-            } else {
-                lcd.print(c_power, 2);
-                lcd.print("W");
-            }
-            break;
-        case '2':
-            c_power = voltsIn * ampsIn;
-            lcd.print("CP ");
-            if (power < 1000) {
-                lcd.print(power);
-                lcd.print("mW ");
-            } else {
-                lcd.print(power/1000.000, 2);
-                lcd.print("W ");
-            }
-            if (c_power < 1) {
-                lcd.print(round(c_power*1000));
-                lcd.print("mW");
-            } else {
-                lcd.print(c_power, 2);
-                lcd.print("W");
-            }
-            lcd.setCursor(0,1);
-            lcd.print("ON ");
-            if (voltsIn < 1) {
-                lcd.print(round(voltsIn*1000));
-                lcd.print("mV ");
-            } else {
-                lcd.print(voltsIn, 2);
-                lcd.print("V ");
-            }
-            sprintf(line2, "%4dmA", round(ampsIn * 1000.000));
-            lcd.print(line2);
-            break;
-        default:
-            Serial.println("foo");
+    if (showTemp) {
+        lcd.print("Temperature: ");
+        lcd.setCursor(0,1);
+        lcd.print(fetTemp);
+        lcd.print(" °C");
+    } else {
+        switch (menu) {
+            case '1':
+                sprintf(line1, "CC %4dmA %4dmA", current, round(ampsIn * 1000.000));
+                lcd.print(line1);
+                /* lcd.print(ampsIn); */
+                lcd.setCursor(0,1);
+                lcd.print("ON ");
+                if (voltsIn < 1) {
+                    lcd.print(round(voltsIn*1000));
+                    lcd.print("mV ");
+                } else {
+                    lcd.print(voltsIn, 2);
+                    lcd.print("V ");
+                }
+                c_power = voltsIn * ampsIn;
+                if (c_power < 1) {
+                    lcd.print(round(c_power*1000));
+                    lcd.print("mW");
+                } else {
+                    lcd.print(c_power, 2);
+                    lcd.print("W");
+                }
+                break;
+            case '2':
+                c_power = voltsIn * ampsIn;
+                lcd.print("CP ");
+                if (power < 1000) {
+                    lcd.print(power);
+                    lcd.print("mW ");
+                } else {
+                    lcd.print(power/1000.000, 2);
+                    lcd.print("W ");
+                }
+                if (c_power < 1) {
+                    lcd.print(round(c_power*1000));
+                    lcd.print("mW");
+                } else {
+                    lcd.print(c_power, 2);
+                    lcd.print("W");
+                }
+                lcd.setCursor(0,1);
+                lcd.print("ON ");
+                if (voltsIn < 1) {
+                    lcd.print(round(voltsIn*1000));
+                    lcd.print("mV ");
+                } else {
+                    lcd.print(voltsIn, 2);
+                    lcd.print("V ");
+                }
+                sprintf(line2, "%4dmA", round(ampsIn * 1000.000));
+                lcd.print(line2);
+                break;
+            default:
+                Serial.println("foo");
+        }
     }
     
 }
@@ -402,11 +410,12 @@ void loop()
             previousMillis = currentMillis;
             fetTemp = readTemp();
             if (fetTemp < MAX_TEMP) {
-                setFanSpeed(readTemp());
+                setFanSpeed(fetTemp);
             } else {
                 load = false;
                 setDac(0);
                 setFanSpeed(100);
+                delay(5000);
                 drawError("Temperature", "Overload !!!");
                 setFanSpeed(0);
             }
@@ -419,8 +428,7 @@ void loop()
     keyPressed = readKeypad();
     if (keyPressed == '#') {
         if (load) {
-            drawError("Stop load first!", " ");
-            
+            showTemp = !showTemp;
         } else {
             setValueMenu(menu);
         }
