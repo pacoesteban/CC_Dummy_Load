@@ -13,6 +13,14 @@
 #define POWER_LIMIT 120000
 #define MAX_TEMP 85
 
+// Matrix setup
+const int SmallestGap = 40;
+const int nButtons = 12;
+int AnalogVals[] = {1023, 680, 640, 590, 547, 507, 464,
+                    411, 351, 273, 180, 133, 0};
+int Buttons[] =    {0,    '1', '4', '7', '*', '2', '3',
+                    '5', '6', '8', '9', '0', '#'};
+
 unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
 unsigned long k_currentMillis = 0;
@@ -116,9 +124,19 @@ void drawOnLoad()
     char line2[16];
     float c_power;
     float say_power;
+    float ampsError;
 
-    ampsIn = (readAdc(1) * 10.0);
-    voltsIn = (readAdc(0) * 8.0);
+    ampsIn = readAdc(1);
+    if (current < 1500) {
+        ampsError = 11.0;
+    } else if (current < 2400) {
+        ampsError = 13.0;
+    } else if (current < 3000) {
+        ampsError = 14.0;
+    } else if (current < 3800) {
+        ampsError = 12.0;
+    }
+    voltsIn = (readAdc(0) * 6.09);
 
     lcd.clear();
     lcd.setCursor(0,0);
@@ -127,11 +145,11 @@ void drawOnLoad()
         lcd.print("Temperature: ");
         lcd.setCursor(0,1);
         lcd.print(fetTemp);
-        lcd.print(" °C");
+        lcd.print(" C");
     } else {
         switch (menu) {
             case '1':
-                sprintf(line1, "CC %4dmA %4dmA", current, round(ampsIn * 1000.000));
+                sprintf(line1, "CC %4dmA %4dmA", current, round((ampsIn * 1000.000) + ampsError));
                 lcd.print(line1);
                 /* lcd.print(ampsIn); */
                 lcd.setCursor(0,1);
@@ -286,35 +304,11 @@ char readKeypad()
     k_currentMillis = millis();
     if ((k_currentMillis - k_previousMillis) > K_INTERVAL) {
         k_previousMillis = k_currentMillis;
-        int sensorValue = analogRead(KEYPAD_PIN);
-
-        if (sensorValue > 920) {
-           caracter = '1';
-        } else if ((sensorValue > 905) && (sensorValue < 915)) {
-            caracter = '2';
-        } else if ((sensorValue > 890) && (sensorValue < 900)) {
-            caracter = '3';
-        } else if ((sensorValue > 848) && (sensorValue < 855)) {
-            caracter = '4';
-        } else if ((sensorValue > 832) && (sensorValue < 842)) {
-            caracter = '5';
-        } else if ((sensorValue > 816) && (sensorValue < 825)) {
-            caracter = '6';
-        } else if ((sensorValue > 782) && (sensorValue < 790)) {
-            caracter = '7';
-        } else if ((sensorValue > 770) && (sensorValue < 780)) {
-            caracter = '8';
-        } else if ((sensorValue > 755) && (sensorValue < 768)) {
-            caracter = '9';
-        } else if ((sensorValue > 728) && (sensorValue < 738)) {
-            caracter = '*';
-        } else if ((sensorValue > 718) && (sensorValue < 725)) {
-            caracter = '0';
-        } else if ((sensorValue > 700) && (sensorValue < 715)) {
-            caracter = '#';
+        int sensorValue = analogRead(KEYPAD_PIN) + SmallestGap/2;
+        for (int i=0; i<=nButtons; i++) {
+            if (sensorValue >= AnalogVals[i]) return Buttons[i];
         }
     }
-    return caracter;
 }
 /* //// Read Value functions */
 
@@ -408,17 +402,18 @@ void loop()
         currentMillis = millis();
         if ((currentMillis - previousMillis) > INTERVAL) {
             previousMillis = currentMillis;
-            fetTemp = readTemp();
-            if (fetTemp < MAX_TEMP) {
-                setFanSpeed(fetTemp);
-            } else {
-                load = false;
-                setDac(0);
-                setFanSpeed(100);
-                delay(5000);
-                drawError("Temperature", "Overload !!!");
-                setFanSpeed(0);
-            }
+            // cagada de construccio. No podem usar le lectura de temp
+            /* fetTemp = readTemp(); */
+            /* if (fetTemp < MAX_TEMP) { */
+            /*     setFanSpeed(fetTemp); */
+            /* } else { */
+            /*     load = false; */
+            /*     setDac(0); */
+            /*     setFanSpeed(100); */
+            /*     delay(2000); */
+            /*     drawError("Temperature", "Overload !!!"); */
+            /*     setFanSpeed(0); */
+            /* } */
             drawOnLoad();
             if (menu == '2') {
                 updatePower();
@@ -428,7 +423,9 @@ void loop()
     keyPressed = readKeypad();
     if (keyPressed == '#') {
         if (load) {
-            showTemp = !showTemp;
+            // cagada de construccio. No podem usar le lectura de temp
+            /* showTemp = !showTemp; */
+            drawError("No, man.", "Not that way");
         } else {
             setValueMenu(menu);
         }
@@ -436,6 +433,8 @@ void loop()
     if (keyPressed == '*') {
         load = !load;
         if (load) {
+            // cagada de construccio. No podem usar le lectura de temp
+            setFanSpeed(50);
             /* Start ! */
             if (menu == '1') {
                 startCC();
@@ -444,6 +443,7 @@ void loop()
                 startCP();
             }
         } else {
+            setFanSpeed(0);
             /* Stop ! */
             setDac(0);
             draw = true;
