@@ -35,6 +35,9 @@ char keyPressed = 'z';
 float ampsIn = 0;
 float voltsIn = 0;
 int fetTemp = 0;
+float c_power;
+float ampsError;
+float powerIn;
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
@@ -117,26 +120,12 @@ void setValueMenu(char menu_section)
     drawMenu(menu);
 }
 
-void drawOnLoad()
+void drawOnLoad(float amps, float volts, float power)
 {
 
     char line1[16];
     char line2[16];
-    float c_power;
     float say_power;
-    float ampsError;
-
-    ampsIn = readAdc(1);
-    if (current < 1500) {
-        ampsError = 11.0;
-    } else if (current < 2400) {
-        ampsError = 13.0;
-    } else if (current < 3000) {
-        ampsError = 14.0;
-    } else if (current < 3800) {
-        ampsError = 12.0;
-    }
-    voltsIn = (readAdc(0) * 6.09);
 
     lcd.clear();
     lcd.setCursor(0,0);
@@ -280,12 +269,22 @@ float getValue(int pos)
 
 void setFanSpeed(int temp)
 {
+    // cagada temperatura, no podem obtenir valor fiable
+    // anem per power
+    /* int fanValue; */
+    /* fanValue = map(temp, 25, 75, 110, 255); */
+    /* if (temp < 25) { */
+    /*     fanValue = 0; */
+    /* } */
+    /* if (temp > 75) { */
+    /*     fanValue = 255; */
+    /* } */
     int fanValue;
-    fanValue = map(temp, 25, 75, 110, 255);
-    if (temp < 25) {
+    fanValue = map(temp, 1, 40, 110, 255);
+    if (temp < 5) {
         fanValue = 0;
     }
-    if (temp > 75) {
+    if (temp > 40) {
         fanValue = 255;
     }
     analogWrite(FAN_PIN, fanValue);
@@ -403,7 +402,7 @@ void loop()
         if ((currentMillis - previousMillis) > INTERVAL) {
             previousMillis = currentMillis;
             // cagada de construccio. No podem usar le lectura de temp
-            /* fetTemp = readTemp(); */
+            fetTemp = readTemp();
             /* if (fetTemp < MAX_TEMP) { */
             /*     setFanSpeed(fetTemp); */
             /* } else { */
@@ -414,18 +413,34 @@ void loop()
             /*     drawError("Temperature", "Overload !!!"); */
             /*     setFanSpeed(0); */
             /* } */
-            drawOnLoad();
+            ampsIn = readAdc(1);
+            if (current < 1500) {
+                ampsError = 11.0;
+            } else if (current < 2400) {
+                ampsError = 13.0;
+            } else if (current < 3000) {
+                ampsError = 14.0;
+            } else if (current < 3800) {
+                ampsError = 12.0;
+            }
+            voltsIn = (readAdc(0) * 6.09);
+            powerIn = ampsIn * voltsIn;
+
+            setFanSpeed(powerIn);
+            drawOnLoad(ampsIn, voltsIn, powerIn);
             if (menu == '2') {
                 updatePower();
             }
         }
+    } else {
+        setFanSpeed(0);
     }
     keyPressed = readKeypad();
     if (keyPressed == '#') {
         if (load) {
             // cagada de construccio. No podem usar le lectura de temp
-            /* showTemp = !showTemp; */
-            drawError("No, man.", "Not that way");
+            showTemp = !showTemp;
+            /* drawError("No, man.", "Not that way"); */
         } else {
             setValueMenu(menu);
         }
@@ -433,8 +448,6 @@ void loop()
     if (keyPressed == '*') {
         load = !load;
         if (load) {
-            // cagada de construccio. No podem usar le lectura de temp
-            setFanSpeed(50);
             /* Start ! */
             if (menu == '1') {
                 startCC();
@@ -443,7 +456,6 @@ void loop()
                 startCP();
             }
         } else {
-            setFanSpeed(0);
             /* Stop ! */
             setDac(0);
             draw = true;
