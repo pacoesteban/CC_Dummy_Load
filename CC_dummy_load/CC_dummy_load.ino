@@ -4,14 +4,13 @@
 
 #define DAC_CS 7
 #define ADC_CS 8
-#define TEMP_PIN A0
 #define KEYPAD_PIN A1
 #define FAN_PIN 9
 #define INTERVAL 1000
 #define K_INTERVAL 250
 #define CURRENT_LIMIT 4095
-#define POWER_LIMIT 120000
-#define MAX_TEMP 85
+#define POWER_LIMIT 75000
+#define MAX_POWER 75
 
 // Matrix setup
 const int SmallestGap = 40;
@@ -30,11 +29,9 @@ long power = 0;
 char menu = '1';
 bool draw = true;
 bool load = false;
-bool showTemp = false;
 char keyPressed = 'z';
 float ampsIn = 0;
 float voltsIn = 0;
-int fetTemp = 0;
 float c_power;
 float ampsError;
 float powerIn;
@@ -130,67 +127,60 @@ void drawOnLoad(float amps, float volts, float power)
     lcd.clear();
     lcd.setCursor(0,0);
 
-    if (showTemp) {
-        lcd.print("Temperature: ");
-        lcd.setCursor(0,1);
-        lcd.print(fetTemp);
-        lcd.print(" C");
-    } else {
-        switch (menu) {
-            case '1':
-                sprintf(line1, "CC %4dmA %4dmA", current, round((ampsIn * 1000.000) + ampsError));
-                lcd.print(line1);
-                /* lcd.print(ampsIn); */
-                lcd.setCursor(0,1);
-                lcd.print("ON ");
-                if (voltsIn < 1) {
-                    lcd.print(round(voltsIn*1000));
-                    lcd.print("mV ");
-                } else {
-                    lcd.print(voltsIn, 2);
-                    lcd.print("V ");
-                }
-                c_power = voltsIn * ampsIn;
-                if (c_power < 1) {
-                    lcd.print(round(c_power*1000));
-                    lcd.print("mW");
-                } else {
-                    lcd.print(c_power, 2);
-                    lcd.print("W");
-                }
-                break;
-            case '2':
-                c_power = voltsIn * ampsIn;
-                lcd.print("CP ");
-                if (power < 1000) {
-                    lcd.print(power);
-                    lcd.print("mW ");
-                } else {
-                    lcd.print(power/1000.000, 2);
-                    lcd.print("W ");
-                }
-                if (c_power < 1) {
-                    lcd.print(round(c_power*1000));
-                    lcd.print("mW");
-                } else {
-                    lcd.print(c_power, 2);
-                    lcd.print("W");
-                }
-                lcd.setCursor(0,1);
-                lcd.print("ON ");
-                if (voltsIn < 1) {
-                    lcd.print(round(voltsIn*1000));
-                    lcd.print("mV ");
-                } else {
-                    lcd.print(voltsIn, 2);
-                    lcd.print("V ");
-                }
-                sprintf(line2, "%4dmA", round(ampsIn * 1000.000));
-                lcd.print(line2);
-                break;
-            default:
-                Serial.println("foo");
-        }
+    switch (menu) {
+        case '1':
+            sprintf(line1, "CC %4dmA %4dmA", current, round((ampsIn * 1000.000) + ampsError));
+            lcd.print(line1);
+            /* lcd.print(ampsIn); */
+            lcd.setCursor(0,1);
+            lcd.print("ON ");
+            if (voltsIn < 1) {
+                lcd.print(round(voltsIn*1000));
+                lcd.print("mV ");
+            } else {
+                lcd.print(voltsIn, 2);
+                lcd.print("V ");
+            }
+            c_power = voltsIn * ampsIn;
+            if (c_power < 1) {
+                lcd.print(round(c_power*1000));
+                lcd.print("mW");
+            } else {
+                lcd.print(c_power, 2);
+                lcd.print("W");
+            }
+            break;
+        case '2':
+            c_power = voltsIn * ampsIn;
+            lcd.print("CP ");
+            if (power < 1000) {
+                lcd.print(power);
+                lcd.print("mW ");
+            } else {
+                lcd.print(power/1000.000, 2);
+                lcd.print("W ");
+            }
+            if (c_power < 1) {
+                lcd.print(round(c_power*1000));
+                lcd.print("mW");
+            } else {
+                lcd.print(c_power, 2);
+                lcd.print("W");
+            }
+            lcd.setCursor(0,1);
+            lcd.print("ON ");
+            if (voltsIn < 1) {
+                lcd.print(round(voltsIn*1000));
+                lcd.print("mV ");
+            } else {
+                lcd.print(voltsIn, 2);
+                lcd.print("V ");
+            }
+            sprintf(line2, "%4dmA", round(ampsIn * 1000.000));
+            lcd.print(line2);
+            break;
+        default:
+            Serial.println("foo");
     }
     
 }
@@ -267,24 +257,14 @@ float getValue(int pos)
     return inString.toFloat();
 }
 
-void setFanSpeed(int temp)
+void setFanSpeed(int watts)
 {
-    // cagada temperatura, no podem obtenir valor fiable
-    // anem per power
-    /* int fanValue; */
-    /* fanValue = map(temp, 25, 75, 110, 255); */
-    /* if (temp < 25) { */
-    /*     fanValue = 0; */
-    /* } */
-    /* if (temp > 75) { */
-    /*     fanValue = 255; */
-    /* } */
     int fanValue;
-    fanValue = map(temp, 1, 40, 110, 255);
-    if (temp < 5) {
+    fanValue = map(watts, 1, 45, 110, 255);
+    if (watts < 5) {
         fanValue = 0;
     }
-    if (temp > 40) {
+    if (watts > 45) {
         fanValue = 255;
     }
     analogWrite(FAN_PIN, fanValue);
@@ -292,11 +272,6 @@ void setFanSpeed(int temp)
 /* //// Action functions */
 
 /* Read Value functions */
-int readTemp()
-{
-    return (5.0 * analogRead(TEMP_PIN) * 100.0) / 1024;
-}
-
 char readKeypad()
 {
     int caracter;
@@ -401,18 +376,6 @@ void loop()
         currentMillis = millis();
         if ((currentMillis - previousMillis) > INTERVAL) {
             previousMillis = currentMillis;
-            // cagada de construccio. No podem usar le lectura de temp
-            fetTemp = readTemp();
-            /* if (fetTemp < MAX_TEMP) { */
-            /*     setFanSpeed(fetTemp); */
-            /* } else { */
-            /*     load = false; */
-            /*     setDac(0); */
-            /*     setFanSpeed(100); */
-            /*     delay(2000); */
-            /*     drawError("Temperature", "Overload !!!"); */
-            /*     setFanSpeed(0); */
-            /* } */
             ampsIn = readAdc(1);
             if (current < 1500) {
                 ampsError = 11.0;
@@ -426,7 +389,17 @@ void loop()
             voltsIn = (readAdc(0) * 6.09);
             powerIn = ampsIn * voltsIn;
 
-            setFanSpeed(powerIn);
+            if (powerIn < MAX_POWER) {
+                setFanSpeed(powerIn);
+            } else {
+                load = false;
+                setDac(0);
+                setFanSpeed(100);
+                drawError("Power", "Overload !!!");
+                delay(5000);
+                setFanSpeed(0);
+            }
+
             drawOnLoad(ampsIn, voltsIn, powerIn);
             if (menu == '2') {
                 updatePower();
@@ -438,9 +411,7 @@ void loop()
     keyPressed = readKeypad();
     if (keyPressed == '#') {
         if (load) {
-            // cagada de construccio. No podem usar le lectura de temp
-            showTemp = !showTemp;
-            /* drawError("No, man.", "Not that way"); */
+            drawError("No, man.", "Not that way");
         } else {
             setValueMenu(menu);
         }
