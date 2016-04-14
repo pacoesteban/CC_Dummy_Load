@@ -24,6 +24,7 @@ unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
 unsigned long k_currentMillis = 0;
 unsigned long k_previousMillis = 0;
+int incLoad = 0;
 int current = 0;
 long power = 0;
 char menu = '1';
@@ -117,13 +118,13 @@ void setValueMenu(char menu_section)
     drawMenu(menu);
 }
 
-void drawOnLoad(float amps, float volts, float power)
+void drawOnLoad()
 {
 
     char line1[16];
     char line2[16];
-    float say_power;
 
+    c_power = voltsIn * ampsIn;
     lcd.clear();
     lcd.setCursor(0,0);
 
@@ -141,7 +142,6 @@ void drawOnLoad(float amps, float volts, float power)
                 lcd.print(voltsIn, 2);
                 lcd.print("V ");
             }
-            c_power = voltsIn * ampsIn;
             if (c_power < 1) {
                 lcd.print(round(c_power*1000));
                 lcd.print("mW");
@@ -151,7 +151,6 @@ void drawOnLoad(float amps, float volts, float power)
             }
             break;
         case '2':
-            c_power = voltsIn * ampsIn;
             lcd.print("CP ");
             if (power < 1000) {
                 lcd.print(power);
@@ -205,7 +204,7 @@ void startCC()
         current = CURRENT_LIMIT;
     }
     if (current > 0) {
-        setDac(current);
+        updateCurrent();
     }
 
 }
@@ -216,14 +215,23 @@ void startCP()
         power = POWER_LIMIT;
     }
     if (power > 0) {
-        updatePower();
+        updateCurrent();
     }
 }
 
-void updatePower()
+void updateCurrent()
 {
     int target_mA;
-    target_mA = round((float)power / voltsIn);
+    switch (menu) {
+        case '1':
+            target_mA = current;
+            break;
+        case '2':
+            target_mA = round((float)power / voltsIn);
+            break;
+        default:
+            setDac(0);
+    }
     if (target_mA > CURRENT_LIMIT) {
         target_mA = CURRENT_LIMIT;
     }
@@ -395,10 +403,8 @@ void loop()
                 setFanSpeed(0);
             }
 
-            drawOnLoad(ampsIn, voltsIn, powerIn);
-            if (menu == '2') {
-                updatePower();
-            }
+            drawOnLoad();
+            updateCurrent();
         }
     } else {
         setFanSpeed(0);
@@ -429,9 +435,43 @@ void loop()
         }
     }
     if (isDigit(keyPressed)) {
-        menu = keyPressed;
-        draw = true;
-        drawMenu(menu);
+        if (load) {
+            switch (keyPressed) {
+                case '2':
+                    incLoad = 100;
+                    break;
+                case '8':
+                    incLoad = -100;
+                    break;
+                case '6':
+                    incLoad = 10;
+                    break;
+                case '4':
+                    incLoad = -10;
+                    break;
+                default:
+                    incLoad = 0;
+            }
+
+            switch (menu) {
+                case '1':
+                    if ((current > 0) && (current < CURRENT_LIMIT)) {
+                        current += incLoad;
+                    }
+                    break;
+                case '2':
+                    if ((power > 0) && (power < POWER_LIMIT)) {
+                        power += incLoad;
+                    }
+                    break;
+                default:
+                    incLoad = 0;
+            }
+        } else {
+            menu = keyPressed;
+            draw = true;
+            drawMenu(menu);
+        }
     }
     draw = false;
 }
