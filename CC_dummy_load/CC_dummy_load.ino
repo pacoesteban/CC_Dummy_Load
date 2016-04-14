@@ -27,15 +27,16 @@ unsigned long k_previousMillis = 0;
 int incLoad = 0;
 int current = 0;
 long power = 0;
+long resistance = 0;
 char menu = '1';
 bool draw = true;
 bool load = false;
 char keyPressed = 'z';
 float ampsIn = 0;
 float voltsIn = 0;
-float c_power;
-float ampsError;
-float powerIn;
+float c_res = 0;
+float ampsError = 0;
+float powerIn = 0;
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
@@ -79,6 +80,17 @@ void drawMenu(int menu_section, bool setMenu = false)
                     sprintf(line2, "%s  W", valueStr);
                 }
                 break;
+            case '3':
+                if (setMenu) {
+                    sectionTitle = "Set Resistance";
+                    sprintf(line2, "       Ohm");
+                } else {
+                    sectionTitle = "Const Resistance";
+                    valueFloat = (float)resistance / 1000.0;
+                    dtostrf(valueFloat,2,2,valueStr);
+                    sprintf(line2, "%s Ohm", valueStr);
+                }
+                break;
             default:
                 sectionTitle = "Option not";
                 sprintf(line2, "available");
@@ -108,6 +120,9 @@ void setValueMenu(char menu_section)
         case '2':
             power = round(userInput * 1000.0);
             break;
+        case '3':
+            resistance = round(userInput * 1000.0);
+            break;
         default:
             lcd.setCursor(0,0);
             lcd.print("No mode !");
@@ -124,7 +139,6 @@ void drawOnLoad()
     char line1[16];
     char line2[16];
 
-    c_power = voltsIn * ampsIn;
     lcd.clear();
     lcd.setCursor(0,0);
 
@@ -142,11 +156,11 @@ void drawOnLoad()
                 lcd.print(voltsIn, 2);
                 lcd.print("V ");
             }
-            if (c_power < 1) {
-                lcd.print(round(c_power*1000));
+            if (powerIn < 1) {
+                lcd.print(round(powerIn*1000));
                 lcd.print("mW");
             } else {
-                lcd.print(c_power, 2);
+                lcd.print(powerIn, 2);
                 lcd.print("W");
             }
             break;
@@ -159,12 +173,41 @@ void drawOnLoad()
                 lcd.print(power/1000.000, 2);
                 lcd.print("W ");
             }
-            if (c_power < 1) {
-                lcd.print(round(c_power*1000));
+            if (powerIn < 1) {
+                lcd.print(round(powerIn*1000));
                 lcd.print("mW");
             } else {
-                lcd.print(c_power, 2);
+                lcd.print(powerIn, 2);
                 lcd.print("W");
+            }
+            lcd.setCursor(0,1);
+            lcd.print("ON ");
+            if (voltsIn < 1) {
+                lcd.print(round(voltsIn*1000));
+                lcd.print("mV ");
+            } else {
+                lcd.print(voltsIn, 2);
+                lcd.print("V ");
+            }
+            sprintf(line2, "%4dmA", round(ampsIn * 1000.000));
+            lcd.print(line2);
+            break;
+        case '3':
+            c_res = voltsIn / ampsIn;
+            lcd.print("CR ");
+            if (resistance < 1000) {
+                lcd.print(resistance);
+                lcd.print("mR ");
+            } else {
+                lcd.print(resistance/1000.000, 2);
+                lcd.print("R ");
+            }
+            if (c_res < 1) {
+                lcd.print(round(c_res*1000));
+                lcd.print("mR");
+            } else {
+                lcd.print(c_res, 2);
+                lcd.print("R");
             }
             lcd.setCursor(0,1);
             lcd.print("ON ");
@@ -218,6 +261,12 @@ void startCP()
         updateCurrent();
     }
 }
+void startCR()
+{
+    if (resistance > 0) {
+        updateCurrent();
+    }
+}
 
 void updateCurrent()
 {
@@ -228,6 +277,9 @@ void updateCurrent()
             break;
         case '2':
             target_mA = round((float)power / voltsIn);
+            break;
+        case '3':
+            target_mA = round(((voltsIn * 1000.0) / (float)resistance) * 1000);
             break;
         default:
             setDac(0);
@@ -427,6 +479,9 @@ void loop()
             if (menu == '2') {
                 startCP();
             }
+            if (menu == '3') {
+                startCR();
+            }
         } else {
             /* Stop ! */
             setDac(0);
@@ -462,6 +517,11 @@ void loop()
                 case '2':
                     if ((power > 0) && (power < POWER_LIMIT)) {
                         power += incLoad;
+                    }
+                    break;
+                case '3':
+                    if (resistance > 0) {
+                        resistance += incLoad;
                     }
                     break;
                 default:
