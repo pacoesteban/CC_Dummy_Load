@@ -180,7 +180,7 @@ void drawOnLoad(float amps, float volts, float power)
             lcd.print(line2);
             break;
         default:
-            Serial.println("foo");
+            lcd.print("foo");
     }
     
 }
@@ -306,11 +306,7 @@ float readAdc(int channel)
   byte adcPrimaryByteMask = 0b00001111;      // b00001111 isolates the 4 LSB for the value returned. 
   adcPrimaryByte &= adcPrimaryByteMask; // Limits the value of the primary byte to the 4 LSB:
   int digitalValue = (adcPrimaryByte << 8) | adcSecondaryByte; // Shifts the 4 LSB of the primary byte to become the 4 MSB of the 12 bit digital value, this is then ORed to the secondary byte value that holds the 8 LSB of the digital value.
-  float value = ((float)digitalValue * 4.096) / 4095.000; // The digital value is converted to an analogue voltage using a VREF of 2.048V.
-
-  /* Serial.print("Channel: "); Serial.print(channel); */
-  /* Serial.print(" Raw value: "); Serial.print(digitalValue); */
-  /* Serial.print(" calculat value: "); Serial.println(value, 4); */
+  float value = ((float)digitalValue * 4.096) / 4095.000; // The digital value is converted to an analogue voltage using a VREF of 4096V.
 
   return value; // Returns the value from the function
 }
@@ -352,7 +348,6 @@ void setup()
     // Timer1 now runs at 31372.55Hz
     // this way we don't "hear" the PWM to the fan.
     TCCR1B = (TCCR1B & 0b11111000) | 0x01; 
-    Serial.begin(9600);
     SPI.begin();
     SPI.setBitOrder(MSBFIRST);
     SPI.setDataMode(SPI_MODE0);
