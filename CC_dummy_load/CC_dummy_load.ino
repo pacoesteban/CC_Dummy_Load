@@ -24,6 +24,8 @@ unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
 unsigned long k_currentMillis = 0;
 unsigned long k_previousMillis = 0;
+unsigned long bat_start_time = 0;
+unsigned long currentTimeSec = 0;
 int incLoad = 0;
 int current = 0;
 long power = 0;
@@ -34,9 +36,10 @@ bool load = false;
 char keyPressed = 'z';
 float ampsIn = 0;
 float voltsIn = 0;
-float c_res = 0;
 float ampsError = 0;
 float powerIn = 0;
+float v_cut = 2.8;
+int mAh = 0;
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
@@ -82,13 +85,13 @@ void drawMenu(int menu_section, bool setMenu = false)
                 break;
             case '3':
                 if (setMenu) {
-                    sectionTitle = "Set Resistance";
-                    sprintf(line2, "       Ohm");
+                    sectionTitle = "Set disch. curr.";
+                    sprintf(line2, "       A");
                 } else {
-                    sectionTitle = "Const Resistance";
-                    valueFloat = (float)resistance / 1000.0;
-                    dtostrf(valueFloat,2,2,valueStr);
-                    sprintf(line2, "%s Ohm", valueStr);
+                    sectionTitle = "Battery Disch.";
+                    valueFloat = (float)current / 1000.0;
+                    dtostrf(valueFloat,3,3,valueStr);
+                    sprintf(line2, "%s  A", valueStr);
                 }
                 break;
             default:
@@ -121,7 +124,7 @@ void setValueMenu(char menu_section)
             power = round(userInput * 1000.0);
             break;
         case '3':
-            resistance = round(userInput * 1000.0);
+            current = round(userInput * 1000.0);
             break;
         default:
             lcd.setCursor(0,0);
@@ -131,6 +134,16 @@ void setValueMenu(char menu_section)
     lcd.noCursor();
     lcd.noBlink();
     drawMenu(menu);
+}
+
+void printResult()
+{
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Battery Disch.");
+    lcd.setCursor(0,1);
+    lcd.print(mAh);
+    lcd.print(" mAh");
 }
 
 void drawOnLoad()
@@ -193,22 +206,10 @@ void drawOnLoad()
             lcd.print(line2);
             break;
         case '3':
-            c_res = voltsIn / ampsIn;
-            lcd.print("CR ");
-            if (resistance < 1000) {
-                lcd.print(resistance);
-                lcd.print("mR ");
-            } else {
-                lcd.print(resistance/1000.000, 2);
-                lcd.print("R ");
-            }
-            if (c_res < 1) {
-                lcd.print(round(c_res*1000));
-                lcd.print("mR");
-            } else {
-                lcd.print(c_res, 2);
-                lcd.print("R");
-            }
+            currentTimeSec = (currentMillis - bat_start_time)/1000;
+            sprintf(line1, "BD %4dmA ", current);
+            lcd.print(line1);
+            printTimeOn(currentTimeSec);
             lcd.setCursor(0,1);
             lcd.print("ON ");
             if (voltsIn < 1) {
@@ -218,14 +219,34 @@ void drawOnLoad()
                 lcd.print(voltsIn, 2);
                 lcd.print("V ");
             }
-            sprintf(line2, "%4dmA", round(ampsIn * 1000.000));
-            lcd.print(line2);
+            mAh = round(current*((float)currentTimeSec/3600));
+            lcd.print(mAh);
+            lcd.print("mAh");
             break;
         default:
             lcd.print("foo");
     }
     
 }
+
+void printTimeOn(long currentSec)
+{
+    int seconds;
+    int minutes;
+
+    minutes = currentSec / 60;
+    seconds = currentSec % 60;
+    if (minutes < 10) {
+        lcd.print("0");
+    }
+    lcd.print(minutes);
+    lcd.print(":");
+    if (seconds < 10) {
+        lcd.print("0");
+    }
+    lcd.print(seconds);
+}
+
 
 void drawError(char line1[17], char line2[17])
 {
@@ -261,11 +282,10 @@ void startCP()
         updateCurrent();
     }
 }
-void startCR()
+void startBD()
 {
-    if (resistance > 0) {
-        updateCurrent();
-    }
+    bat_start_time = millis();
+    startCC();
 }
 
 void updateCurrent()
@@ -279,7 +299,7 @@ void updateCurrent()
             target_mA = round((float)power / voltsIn);
             break;
         case '3':
-            target_mA = round(((voltsIn * 1000.0) / (float)resistance) * 1000);
+            target_mA = current;
             break;
         default:
             setDac(0);
@@ -321,7 +341,7 @@ void setFanSpeed(int watts)
 {
     int fanValue;
     fanValue = map(watts, 1, 45, 110, 255);
-    if (watts < 5) {
+    if (watts < 1) {
         fanValue = 0;
     }
     if (watts > 45) {
@@ -457,6 +477,14 @@ void loop()
 
             drawOnLoad();
             updateCurrent();
+            if (menu == '3') {
+                if (voltsIn < v_cut) {
+                    load = false;
+                    setDac(0);
+                    setFanSpeed(0);
+                    printResult();
+                }
+            }
         }
     } else {
         setFanSpeed(0);
@@ -464,7 +492,7 @@ void loop()
     keyPressed = readKeypad();
     if (keyPressed == '#') {
         if (load) {
-            drawError("No, man.", "Not that way");
+            /* drawError("No, man.", "Not that way"); */
         } else {
             setValueMenu(menu);
         }
@@ -480,7 +508,7 @@ void loop()
                 startCP();
             }
             if (menu == '3') {
-                startCR();
+                startBD();
             }
         } else {
             /* Stop ! */
@@ -517,11 +545,6 @@ void loop()
                 case '2':
                     if ((power > 0) && (power < POWER_LIMIT)) {
                         power += incLoad;
-                    }
-                    break;
-                case '3':
-                    if (resistance > 0) {
-                        resistance += incLoad;
                     }
                     break;
                 default:
