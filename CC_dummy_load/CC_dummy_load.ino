@@ -259,6 +259,18 @@ void drawError(char line1[17], char line2[17])
     delay(1500);
 }
 
+void serialOut()
+{
+    Serial.print(menu); Serial.print(",");
+    Serial.print(current); Serial.print(",");
+    Serial.print(voltsIn*1000); Serial.print(",");
+    Serial.print((ampsIn*1000) + ampsError); Serial.print(",");
+    Serial.print(powerIn); Serial.print(",");
+    Serial.print(v_cut); Serial.print(",");
+    Serial.print(mAh); Serial.print(",");
+    Serial.println(currentTimeSec);
+}
+
 /* //// Menu and print functions */
 
 /* Action functions */
@@ -436,6 +448,8 @@ void setup()
     setDac(0);
     setFanSpeed(0);
 
+    Serial.begin(9600);
+
     lcd.begin(16,2);
     lcd.backlight();
     lcd.clear();
@@ -477,6 +491,7 @@ void loop()
 
             drawOnLoad();
             updateCurrent();
+            serialOut();
             if (menu == '3') {
                 if (voltsIn < v_cut) {
                     load = false;
