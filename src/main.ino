@@ -157,7 +157,7 @@ void drawOnLoad()
 
     switch (menu) {
         case '1':
-            sprintf(line1, "CC %4dmA %4dmA", current, round((ampsIn * 1000.000) + ampsError));
+            sprintf(line1, "CC %4dmA %4ldmA", current, round((ampsIn * 1000.000) + ampsError));
             lcd.print(line1);
             /* lcd.print(ampsIn); */
             lcd.setCursor(0,1);
@@ -202,7 +202,7 @@ void drawOnLoad()
                 lcd.print(voltsIn, 2);
                 lcd.print("V ");
             }
-            sprintf(line2, "%4dmA", round(ampsIn * 1000.000));
+            sprintf(line2, "%4ldmA", round(ampsIn * 1000.000));
             lcd.print(line2);
             break;
         case '3':
@@ -248,7 +248,7 @@ void printTimeOn(long currentSec)
 }
 
 
-void drawError(char line1[17], char line2[17])
+void drawError(const char line1[17], const char line2[17])
 {
     lcd.clear();
     lcd.setCursor(0,0);
@@ -366,7 +366,6 @@ void setFanSpeed(int watts)
 /* Read Value functions */
 char readKeypad()
 {
-    int caracter;
     k_currentMillis = millis();
     if ((k_currentMillis - k_previousMillis) > K_INTERVAL) {
         k_previousMillis = k_currentMillis;
@@ -375,6 +374,7 @@ char readKeypad()
             if (sensorValue >= AnalogVals[i]) return Buttons[i];
         }
     }
+    return 'x';
 }
 /* //// Read Value functions */
 
